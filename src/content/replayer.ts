@@ -192,6 +192,18 @@ export class Replayer {
    */
   private boundEls = new WeakSet<Element>();
 
+  /**
+   * element -> id của change đang CHIẾM nó.
+   *
+   * Một element chỉ thuộc về đúng một change. Không có sổ này thì hai change trỏ
+   * vào hai node giống hệt nhau — hai ô cùng chữ trong một bảng — sẽ dò hoàn
+   * toàn độc lập, cùng chấm ứng viên điểm cao nhất, rồi cùng ghi vào MỘT ô; ô
+   * còn lại không bao giờ được ai nhận, nên sửa hai ô mà chỉ thấy một ô đổi.
+   *
+   * WeakMap: node bị trang vứt đi thì mục tương ứng tự biến mất theo.
+   */
+  private ownerOf = new WeakMap<Element, string>();
+
   private runCount = 0;
 
   private running = false;
@@ -255,6 +267,9 @@ export class Replayer {
         } catch (e) {
           log.error('Replayer.load: cleanup failed', id, e);
         }
+        // Change đã rời tập thì phải nhả element nó đang giữ, nếu không ô đó bị
+        // khoá và change còn lại không bao giờ nhận được.
+        this.releaseRecord(rec);
         this.styles.clearChange(id);
       }
 
@@ -375,6 +390,8 @@ export class Replayer {
         log.error('Replayer.revert: restore failed', rec.item.change.id, e);
       }
       rec.restore = undefined;
+      // Nhả TRƯỚC khi bỏ WeakRef, nếu không mất luôn đường tìm lại element.
+      this.releaseRecord(rec);
       rec.element = null;
       rec.bound = false;
       rec.detached = false;
@@ -414,6 +431,9 @@ export class Replayer {
   reset(): void {
     this.records.clear();
     this.boundEls = new WeakSet<Element>();
+    // Sổ chủ sở hữu cũng phải bỏ hẳn: cây DOM sắp khác, mọi quyền sở hữu cũ
+    // đều vô nghĩa và giữ lại chỉ tổ chặn nhầm.
+    this.ownerOf = new WeakMap<Element, string>();
     invalidateCache();
     this.styles.clear();
     this.styles.flush();
@@ -585,8 +605,25 @@ export class Replayer {
   /** The live element a record is bound to, or null when it is gone. */
   private boundElement(rec: ChangeRecord): Element | null {
     const el = rec.element?.deref() ?? null;
-    if (!el || !el.isConnected) return null;
+    if (!el || !el.isConnected) {
+      // Node chết hoặc bị gỡ khỏi tài liệu: NHẢ quyền sở hữu ngay. Giữ lại là
+      // khoá vĩnh viễn một chỗ mà không change nào còn dùng — và nếu trang gắn
+      // lại đúng node đó thì không ai được phép nhận nó nữa.
+      if (el) this.releaseOwnership(el, rec.item.change.id);
+      return null;
+    }
     return el;
+  }
+
+  /** Nhả quyền sở hữu một element, nhưng chỉ khi nó đúng là của change này. */
+  private releaseOwnership(el: Element, changeId: string): void {
+    if (this.ownerOf.get(el) === changeId) this.ownerOf.delete(el);
+  }
+
+  /** Nhả element mà một record đang giữ, dùng khi record thôi bám vào nó. */
+  private releaseRecord(rec: ChangeRecord): void {
+    const el = rec.element?.deref();
+    if (el) this.releaseOwnership(el, rec.item.change.id);
   }
 
   /**
@@ -603,6 +640,13 @@ export class Replayer {
       threshold: this.settings.matchThreshold,
       margin: this.settings.matchMargin,
       cacheKey: change.id,
+      // Chỉ loại element đang thuộc về change KHÁC. Element của chính mình thì
+      // vẫn phải nhận lại được, nếu không mỗi lượt dò lại là một lần tự đá mình
+      // ra khỏi chỗ vừa chiếm.
+      taken: (el) => {
+        const owner = this.ownerOf.get(el);
+        return owner !== undefined && owner !== change.id;
+      },
     });
 
     rec.score = result.score;
@@ -620,6 +664,7 @@ export class Replayer {
     rec.element = new WeakRef(result.element);
     rec.bound = true;
     this.boundEls.add(result.element);
+    this.ownerOf.set(result.element, change.id);
     primeCache(change.id, result.element);
     return result.element;
   }
@@ -927,6 +972,9 @@ export class Replayer {
 
     rec.detached = true;
     rec.bound = false;
+    // Node đã bị gỡ khỏi trang: nhả nó ra. Giữ WeakRef để `restore` còn gắn lại
+    // được, nhưng quyền sở hữu thì phải trả để change khác dùng lại chỗ đó.
+    this.releaseOwnership(el, rec.item.change.id);
     rec.element = new WeakRef(el);
 
     // Compose, do not replace: if the framework re-mounted a copy we removed it

@@ -25,6 +25,7 @@ import {
   MATCH_WEIGHTS,
   MAX_CANDIDATES,
   TAG_MISMATCH_PENALTY,
+  STRUCTURAL_TIEBREAK_MARGIN,
   TEST_ID_ATTRS,
   TEXT_FINGERPRINT_MAX,
   TEXT_ONLY_FUZZY_PENALTY,
@@ -67,6 +68,15 @@ export interface MatchOptions {
   root?: ParentNode;
   /** Usually the Change.id; enables the WeakRef fast path across re-renders. */
   cacheKey?: string;
+  /**
+   * Element đã bị một change KHÁC chiếm, trả true thì bỏ qua hẳn.
+   *
+   * Không có nó thì hai change trỏ vào hai node giống hệt nhau (hai ô cùng chữ
+   * trong một bảng) sẽ chấm điểm hoàn toàn độc lập, cùng chọn ứng viên điểm cao
+   * nhất, và cùng ghi vào MỘT ô — ô còn lại không bao giờ được ai nhận. Một
+   * element chỉ thuộc về đúng một change tại một thời điểm.
+   */
+  taken?: (el: Element) => boolean;
 }
 
 /* ========================================================================== */
@@ -1022,6 +1032,8 @@ interface Ranking {
   best: Element | null;
   bestScore: number;
   runnerUp: number;
+  /** Giữ lại để phá thế hoà bằng vị trí khi hai ứng viên gần bằng điểm. */
+  runnerUpEl: Element | null;
   scored: number;
 }
 
@@ -1031,10 +1043,15 @@ function rank(
   ctx: ScoreContext,
   startedAt: number,
   seed: Ranking,
+  taken?: (el: Element) => boolean,
 ): Ranking {
-  let { best, bestScore, runnerUp, scored } = seed;
+  let { best, bestScore, runnerUp, runnerUpEl, scored } = seed;
   for (let i = 0; i < pool.length; i++) {
     const el = pool[i];
+    // Element đã thuộc về change khác: bỏ qua hẳn, kể cả khi nó đạt điểm cao
+    // nhất. Đây là thứ buộc change thứ hai phải đi tìm ô còn lại thay vì bám
+    // vào đúng ô mà change thứ nhất đã lấy.
+    if (taken?.(el)) continue;
     // Cheap bail-out: a tag mismatch can never beat an already-excellent
     // same-tag candidate, so stop paying for the walk.
     if (bestScore > 0.9 && derivedOf(el, ctx).tag !== fp.tag) break;
@@ -1042,17 +1059,19 @@ function rank(
     scored++;
     if (score > bestScore) {
       runnerUp = bestScore;
+      runnerUpEl = best;
       bestScore = score;
       best = el;
     } else if (score > runnerUp) {
       runnerUp = score;
+      runnerUpEl = el;
     }
     if ((i & 15) === 15 && performance.now() - startedAt > SCORE_BUDGET_MS) {
       log.debug('match scoring budget exhausted', { scored, pool: pool.length });
       break;
     }
   }
-  return { best, bestScore, runnerUp, scored };
+  return { best, bestScore, runnerUp, runnerUpEl, scored };
 }
 
 /**
@@ -1082,7 +1101,11 @@ function strategyFor(state: GenState, usedAnchor: boolean): MatchStrategy {
  * hoặc user vừa sửa xong). Trả null ngay khi có từ hai ứng viên trở lên — mơ hồ
  * thì để bộ chấm điểm phân giải, tuyệt đối không đoán.
  */
-function uniqueElementByOwnText(fp: ElementFingerprint, scope: Scope): Element | null {
+function uniqueElementByOwnText(
+  fp: ElementFingerprint,
+  scope: Scope,
+  taken?: (el: Element) => boolean,
+): Element | null {
   const wanted: string[] = [];
   for (const candidate of [fp.ownText, fp.ownTextAlt]) {
     // Chuỗi bị `truncate` cắt (có '…' ở đuôi) không còn là giá trị tuyệt đối
@@ -1106,6 +1129,11 @@ function uniqueElementByOwnText(fp: ElementFingerprint, scope: Scope): Element |
       const el = node.parentElement;
       if (!el || tagOf(el) !== fp.tag) continue;
       if (isSkippedElement(el) || isOurNode(el)) continue;
+      // Bỏ element đã thuộc về change khác. Nhờ vậy hai ô giống hệt nhau tự
+      // giải quyết được: change thứ nhất lấy ô đầu, đến lượt change thứ hai thì
+      // ô còn lại là ứng viên DUY NHẤT nên đường tắt nhận ngay, không cần tới
+      // điểm số và cũng không dính bẫy "mơ hồ".
+      if (taken?.(el)) continue;
       if (!wanted.includes(normalizeText(ownText(el)))) continue;
       // Hai element khác nhau cùng khớp -> mơ hồ, nhường cho bộ chấm điểm.
       if (found && found !== el) return null;
@@ -1154,11 +1182,13 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
     // element would score differently depending on which route found it.
     const anchor = ensureAnchor(fp, scope, ctx);
 
+    const taken = opts.taken;
+
     /* --- 1. cache fast path --------------------------------------------- */
     if (opts.cacheKey) {
       const ref = cache.get(opts.cacheKey);
       const cached = ref ? ref.deref() : undefined;
-      if (cached && cached.isConnected) {
+      if (cached && cached.isConnected && !taken?.(cached)) {
         const score = scoreWith(fp, cached, ctx);
         if (score >= threshold) {
           return {
@@ -1190,6 +1220,9 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
     const verify = (el: Element | null | undefined): number => {
       if (!el) return -1;
       try {
+        // Đã thuộc về change khác thì mọi đường tắt cũng phải bỏ qua, nếu không
+        // chúng sẽ lách qua đúng cái chốt vừa dựng ở phần chấm điểm.
+        if (taken?.(el)) return -1;
         if (tagOf(el) !== fp.tag) return -1;
         if (isSkippedElement(el) || isOurNode(el)) return -1;
       } catch {
@@ -1238,7 +1271,7 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
     // bao giờ lọt vào đây. Chỉ khi chuỗi xuất hiện nhiều chỗ mới cần tới điểm
     // số để phân giải.
     {
-      const exact = uniqueElementByOwnText(fp, scope);
+      const exact = uniqueElementByOwnText(fp, scope, taken);
       if (exact) {
         const score = verify(exact);
         if (score >= 0) return accept(exact, score, 'text');
@@ -1295,13 +1328,19 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
     if (state.total === 0) return emptyResult();
 
     /* --- 4./5. score & rank --------------------------------------------- */
-    let ranking: Ranking = { best: null, bestScore: 0, runnerUp: 0, scored: 0 };
-    ranking = rank(fp, state.sameTag, ctx, startedAt, ranking);
+    let ranking: Ranking = {
+      best: null,
+      bestScore: 0,
+      runnerUp: 0,
+      runnerUpEl: null,
+      scored: 0,
+    };
+    ranking = rank(fp, state.sameTag, ctx, startedAt, ranking, taken);
     if (ranking.bestScore < threshold && state.otherTag.length > 0) {
-      ranking = rank(fp, state.otherTag, ctx, startedAt, ranking);
+      ranking = rank(fp, state.otherTag, ctx, startedAt, ranking, taken);
     }
 
-    const { best, bestScore, runnerUp, scored } = ranking;
+    const { best, bestScore, runnerUp, runnerUpEl, scored } = ranking;
     const strategy = strategyFor(state, usedAnchor);
 
     if (!best || bestScore < threshold) {
@@ -1315,7 +1354,28 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
       };
     }
 
-    const ambiguous = bestScore - runnerUp < margin;
+    let ambiguous = bestScore - runnerUp < margin;
+
+    // Hai ứng viên sát điểm nhau nhưng ĐỨNG Ở HAI CHỖ KHÁC NHAU thì thật ra
+    // không hề mơ hồ — chỉ là mọi tín hiệu nội dung của chúng đều giống hệt.
+    // Đúng cảnh hai ô cùng chữ trong một bảng: chữ, thẻ, class, tổ tiên đều
+    // trùng khít, và thứ DUY NHẤT phân biệt được là vị trí.
+    //
+    // Bỏ cuộc ở đây là bỏ cuộc oan: người dùng sửa hai ô thì phải ăn cả hai. Nên
+    // khi đường đi tới ứng viên tốt nhất khớp rõ rệt hơn ứng viên nhì, ta tin
+    // vào vị trí thay vì tuyên bố mơ hồ.
+    if (ambiguous && runnerUpEl && best !== runnerUpEl) {
+      const bestPath = pathSuffixRatio(fp.path, pathOf(best, ctx));
+      const runnerPath = pathSuffixRatio(fp.path, pathOf(runnerUpEl, ctx));
+      if (bestPath - runnerPath >= STRUCTURAL_TIEBREAK_MARGIN) ambiguous = false;
+      // Cùng cha thì `childIndex` là thước đo trực tiếp nhất; path có thể trùng
+      // nhau khi hai node cùng tag đứng cạnh nhau dưới cùng một cha.
+      else if (best.parentElement && best.parentElement === runnerUpEl.parentElement) {
+        const bestIdx = indexScore(fp.childIndex, elementChildIndex(best));
+        const runnerIdx = indexScore(fp.childIndex, elementChildIndex(runnerUpEl));
+        if (bestIdx - runnerIdx >= STRUCTURAL_TIEBREAK_MARGIN) ambiguous = false;
+      }
+    }
 
     /* --- 6. remember it -------------------------------------------------- */
     if (opts.cacheKey && !ambiguous) primeCache(opts.cacheKey, best);

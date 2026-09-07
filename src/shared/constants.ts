@@ -116,6 +116,17 @@ export const VOLATILE_CLASS_BOOST = 0.1;
  */
 export const TEXT_ONLY_FUZZY_PENALTY = 0.6;
 
+/**
+ * Chênh lệch tối thiểu về VỊ TRÍ để phá thế hoà giữa hai ứng viên sát điểm.
+ *
+ * Dùng cho đúng cảnh hai node giống hệt nhau về nội dung (hai ô cùng chữ trong
+ * một bảng): mọi tín hiệu khác đều trùng khít, chỉ còn đường đi và thứ tự trong
+ * đám anh em là phân biệt được. Ngưỡng đặt vừa phải — đủ để bỏ qua sai số làm
+ * tròn, nhưng không cần cao vì hai node ở hai chỗ khác nhau thì chỉ số vị trí
+ * của chúng lệch nhau rõ rệt chứ không lệch chút xíu.
+ */
+export const STRUCTURAL_TIEBREAK_MARGIN = 0.15;
+
 /* -------------------------------- matching -------------------------------- */
 
 /** Hard cap on candidates scored per fingerprint, to keep replay cheap. */
