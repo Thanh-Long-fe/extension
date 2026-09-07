@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "DOM Modifier — Snapshot & Replayer",
+  "version": "0.1.0",
+  "description": "Ghi lai chinh sua DOM tu DevTools va tu dong ap dung lai khi reload / SPA re-render.",
+  "minimum_chrome_version": "120",
+
+  "permissions": ["storage", "unlimitedStorage", "tabs", "scripting"],
+  "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DOM Modifier",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "ISOLATED"
+    }
+  ]
+}

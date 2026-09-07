@@ -1,0 +1,34 @@
+{
+  "name": "dom-modifier",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "DOM Snapshot & Replayer - record DevTools edits and replay them on reload / SPA re-render",
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "build:popup": "vite build",
+    "build:content": "vite build --config vite.content.config.ts",
+    "build:background": "vite build --config vite.background.config.ts",
+    "build:static": "node scripts/copy-static.mjs",
+    "build:obfuscate": "node scripts/obfuscate.mjs",
+    "build": "npm run typecheck && npm run build:popup && npm run build:content && npm run build:background && npm run build:static && npm run build:obfuscate",
+    "build:raw": "npm run typecheck && npm run build:popup && npm run build:content && npm run build:background && npm run build:static",
+    "dev": "node scripts/dev.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.7",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "javascript-obfuscator": "^4.1.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.2.2"
+  }
+}

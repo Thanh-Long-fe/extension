@@ -1,0 +1,371 @@
+================================================================
+   DOM MODIFIER - HUONG DAN SU DUNG
+   Danh cho nguoi khong ranh ky thuat
+================================================================
+
+Doc file nay bang Notepad hoac bat ky trinh xem van ban nao.
+Neu chu bi loi font, mo bang Notepad va chon Encoding = UTF-8.
+
+
+----------------------------------------------------------------
+1. TIEN ICH NAY LAM GI?
+----------------------------------------------------------------
+
+Ban co bao gio sua thu mot con so, mot dong chu tren trang web
+de xem no trong nhu the nao chua? Kieu doi "5.000" thanh "600.050"
+de chup man hinh, hoac de xem bo cuc co vo khong?
+
+Van de: chi can bam F5 la tat ca bay sach.
+
+Tien ich nay ghi nho nhung gi ban sua, roi TU DONG SUA LAI sau
+moi lan tai trang. Ban sua mot lan, no giu mai.
+
+QUAN TRONG - doc ky cho nay:
+
+  Nhung thay doi nay CHI HIEN TREN MAY BAN. Khong ai khac nhin
+  thay. Khong co gi duoc gui len mang. Trang web that su khong
+  he bi thay doi - ban chi dang doi cai hinh anh hien ra tren
+  man hinh cua chinh minh.
+
+  Vi vay dung dung no de lam bang chung, de khoe so lieu voi
+  sep, hay de chup man hinh gui cho khach hang. Do la lam gia.
+
+
+----------------------------------------------------------------
+2. CAI DAT (chi lam 1 lan)
+----------------------------------------------------------------
+
+  1. Mo trinh duyet Chrome.
+
+  2. Go vao thanh dia chi:      chrome://extensions
+     Roi bam Enter.
+
+  3. Goc tren ben phai co cong tac "Developer mode" (Che do nha
+     phat trien). Bat no len.
+
+  4. Bam nut "Load unpacked" (Tai tien ich da giai nen) vua hien
+     ra o goc tren ben trai.
+
+  5. Tim den thu muc du an, chon thu muc ten la:   dist
+     Bam "Select Folder".
+
+  6. Xong. Ban se thay bieu tuong tien ich xuat hien tren thanh
+     cong cu (goc tren ben phai Chrome).
+
+Neu khong thay bieu tuong: bam vao hinh manh ghep o goc tren ben
+phai, tim "DOM Modifier", bam vao hinh dinh ghim de gan no ra
+ngoai cho de bam.
+
+
+----------------------------------------------------------------
+3. DUNG LAN DAU - LAM THEO TUNG BUOC
+----------------------------------------------------------------
+
+BUOC 1: Mo trang web ban muon sua
+
+  Mo binh thuong nhu moi ngay.
+
+  LUU Y: Neu trang da mo TU TRUOC khi ban cai tien ich, phai bam
+  F5 mot lan thi tien ich moi hoat dong tren trang do.
+
+
+BUOC 2: Bat che do ghi
+
+  - Bam vao bieu tuong tien ich tren thanh cong cu.
+  - Bam nut "Bat dau ghi thay doi".
+  - Nut se chuyen thanh mau do, co chu "Dang ghi - bam de dung".
+  - Bieu tuong tren thanh cong cu hien chu REC mau do.
+
+  Cu de bang thong bao do mo hoac dong deu duoc, khong sao.
+
+
+BUOC 3: Mo cong cu sua trang
+
+  Bam phim F12.
+
+  Mot bang lon se hien ra (thuong o ben phai hoac ben duoi).
+  Do la "DevTools" - cong cu co san cua Chrome, khong phai
+  cua tien ich nay.
+
+  Trong bang do, bam vao tab ten "Elements".
+  Ben trong la toan bo cau truc cua trang web.
+
+
+BUOC 4: Sua thu mot thu gi do
+
+  Cach de nhat de tim dung cho:
+
+    - Bam chuot phai vao chu ban muon doi (ngay tren trang web).
+    - Chon "Inspect" (Kiem tra).
+    - Bang Elements se tu nhay den dung dong chua chu do.
+
+  Roi:
+
+    - Bam DUP chuot vao chu do trong bang Elements.
+    - Go chu moi.
+    - Bam Enter.
+
+  Chu tren trang doi ngay lap tuc.
+
+
+BUOC 5: Kiem tra tien ich da ghi duoc chua
+
+  Bam lai vao bieu tuong tien ich.
+
+  Ban se thay mot dong moi trong danh sach, dai khai:
+
+      [text]  span "5.000 NT$"
+              5.000 NT$  ->  600.050 NT$
+              dang ap dung
+
+  Dong chu "dang ap dung" mau xanh nghia la MOI THU DANG TOT.
+
+
+BUOC 6: Thu bam F5
+
+  Bam F5 de tai lai trang.
+
+  Doi vai giay. Chu ban sua se tu quay lai.
+
+  Mo lai tien ich, ban se thay dong:
+
+      khoi phuc 1 sau khi tai lai
+
+  Vay la xong. Ban vua sua mot lan va no tu giu lai.
+
+
+----------------------------------------------------------------
+4. HAI CACH LUU - KHAC NHAU CHO NAO?
+----------------------------------------------------------------
+
+Day la phan hay nham nhat. Doc ky mot lan la hieu.
+
+  BAN NHAP (tu dong, khong can lam gi)
+
+    - Tu luu, khong can bam nut nao.
+    - Song qua: bam F5, trang tu tai lai.
+    - CHET khi: ban dong tab, hoac tat Chrome.
+    - Dung cho: nghich thu, xem thu, viec lam trong hom nay.
+
+  SNAPSHOT (phai tu bam nut "Luu Snapshot")
+
+    - Phai bam nut moi co.
+    - Song qua: dong tab, tat may, khoi dong lai Chrome.
+    - Con mai den khi ban tu xoa.
+    - Dung cho: nhung thay doi ban muon giu lau dai.
+
+CACH NHO DON GIAN:
+
+    Ban nhap  = tam thoi, mat khi dong Chrome.
+    Snapshot  = lau dai, khong mat.
+
+    Muon giu qua ngay mai -> PHAI bam "Luu Snapshot".
+
+
+CACH LUU SNAPSHOT:
+
+  1. Trong tien ich, bam nut "Luu Snapshot" o duoi cung.
+  2. Dat ten de sau nay ban con nho (vi du: "Bao cao thang 3").
+  3. Bam "Luu snapshot".
+
+  Tu gio no se tu ap dung moi khi ban vao lai trang do.
+
+
+----------------------------------------------------------------
+5. DOC HIEU MAN HINH TIEN ICH
+----------------------------------------------------------------
+
+Tien ich co 3 tab o tren cung:
+
+  Record     - noi ban ghi va xem cac thay doi moi
+  Snapshots  - danh sach nhung gi da luu lau dai
+  Settings   - cai dat
+
+
+TRONG TAB "Record", moi dong la mot thay doi. Cuoi moi dong co
+mot dong chu nho cho biet no dang the nao:
+
+  "dang ap dung"
+      Tot. Thay doi dang co hieu luc tren trang.
+
+  "chua tim thay phan tu"
+      Tien ich khong tim lai duoc cho can sua tren trang.
+      Thuong vi trang da doi bo cuc, hoac phan do chua hien ra.
+      -> Xem muc 7.
+
+  "nhieu phan tu giong nhau"
+      Tren trang co nhieu cho giong het nhau, tien ich khong dam
+      doan cho nao dung nen khong sua gi ca. Nhu vay an toan hon
+      la sua nham cho.
+
+  "ap dung loi"
+      Co truc trac. Thu xoa dong do va lam lai.
+
+  "dang tat"
+      Ban da bo tich o dau dong. Bo tich lai la chay.
+
+
+CAC DONG CHU KHAC:
+
+  "Da luu nhap luc 14:32:07 - F5 se tu ap lai"
+      Yen tam, moi thu da duoc luu.
+
+  "khoi phuc 3 sau khi tai lai"
+      Vua tai lai trang va 3 thay doi da duoc dat lai vao cho.
+
+  "3 chua len trang"
+      Co 3 thay doi ghi duoc nhung chua hien tren trang.
+      Bam vao tung dong de xem ly do.
+
+  "da loc 47 nhieu tu app"
+      Tien ich da bo qua 47 thay doi do CHINH TRANG WEB tu tao ra
+      (quang cao tu doi, dong ho chay, so lieu tu cap nhat...).
+      Con so nay cang lon cang tot - nghia la no dang loc sach.
+
+
+CHAM TRON MAU o cuoi moi dong = do chac chan:
+
+  xanh la  - chac chan la ban sua
+  vang     - khong chac lam
+  do       - nhieu kha nang la trang tu doi, khong phai ban
+
+
+----------------------------------------------------------------
+6. CAC NUT KHAC
+----------------------------------------------------------------
+
+  "Chon tat ca" / "Bo chon"
+      Bat hoac tat cung luc moi thay doi trong danh sach.
+
+  O tich dau moi dong
+      Tat rieng mot thay doi. Tat la no bien khoi trang ngay.
+      Tich lai la no quay ve. Dung de so sanh truoc/sau.
+
+  Hinh cai dich (o cuoi moi dong)
+      Bam vao se to sang cho do tren trang, de ban biet no o dau.
+
+  Hinh thung rac
+      Xoa han dong do.
+
+  "Xoa het"
+      Xoa toan bo danh sach dang co. Khong lay lai duoc.
+
+  "Ap dung lai" (thanh duoi cung)
+      Bat tien ich thu sua lai ngay. Dung khi trang doi bo cuc
+      va thay doi cua ban bi mat.
+
+  Nut mui ten quay lui (thanh duoi cung)
+      Tra trang ve nguyen ban ban dau. Khong xoa gi ca -
+      bam "Ap dung lai" la moi thu quay tro lai.
+
+
+----------------------------------------------------------------
+7. GAP TRUC TRAC - THU LAN LUOT
+----------------------------------------------------------------
+
+TIEN ICH BAO "Khong ket noi duoc voi trang nay"
+
+  Trang da mo tu truoc khi cai tien ich. Bam F5 la xong.
+
+  Neu van khong duoc: tien ich khong chay duoc tren cac trang
+  dac biet cua Chrome (dia chi bat dau bang chrome://) va tren
+  Chrome Web Store. Do la quy dinh cua Chrome, khong sua duoc.
+
+
+SUA XONG MA DANH SACH TRONG KHONG
+
+  - Ban da bam "Bat dau ghi thay doi" chua? Kiem tra nut co dang
+    mau do khong.
+  - Thu sua lai lan nua, cham rai hon.
+  - Vao tab Settings, muc "Muc loc khi ghi", doi thanh
+    "Tat ca - khong loc". Roi thu lai.
+
+
+CO TRONG DANH SACH NHUNG TRANG KHONG DOI GI
+
+  Nhin dong chu nho cuoi moi dong (xem muc 5) de biet ly do.
+
+  Neu ghi "chua tim thay phan tu":
+    - Doi vai giay, no van dang thu tim.
+    - Bam nut "Ap dung lai" o thanh duoi.
+    - Cuon den cho co phan tu do roi bam "Ap dung lai".
+
+  Neu cham mau vang hoac do:
+    Vao Settings, tat cong tac "Chi ap lai thay doi do ban sua".
+    Neu sau do no len -> tien ich da cham nham diem tin cay.
+
+
+F5 XONG BI MAT
+
+  - Vao Settings, kiem tra "Tu luu & khoi phuc thay doi chua luu"
+    phai dang BAT.
+  - Neu ban vua dong tab hoac tat Chrome thi ban nhap mat that -
+    do la dung thiet ke. Lan sau nho bam "Luu Snapshot".
+
+
+SUA O VUONG NHAP LIEU (o dien ten, dien so) KHONG AN
+
+  Cai nay hien tai CHUA LAM DUOC. Khong phai ban lam sai.
+
+  Ly do ky thuat: gia tri dang hien trong o nhap lieu khong nam
+  trong cau truc trang theo cach ma tien ich co the nhin thay.
+  Day la tinh nang chua co, khong phai loi.
+
+
+TRANG WEB CAP NHAT GIAO DIEN MOI, MOI THU HONG HET
+
+  Binh thuong. Khi chu trang web thay doi cach dung trang, cac
+  diem danh dau cu khong con dung nua.
+
+  Cach xu ly: xoa snapshot cu, sua lai tu dau.
+
+
+----------------------------------------------------------------
+8. NHUNG DIEU NEN BIET TRUOC
+----------------------------------------------------------------
+
+  - Chi minh ban thay. Khong ai khac thay. Khong gui len mang.
+
+  - Trang web khong he bi sua that. Ban chi dang doi hinh anh
+    hien tren man hinh may minh.
+
+  - Dung de lam gia so lieu, gia bang chung, gia anh chup man
+    hinh gui nguoi khac. Do la lua doi.
+
+  - Tren nhung trang doi noi dung lien tuc (Facebook, bang so
+    lieu tu cap nhat), doi khi thay doi cua ban bi trang ghi de
+    trong chop mat roi tien ich sua lai. Nhap nhay mot cai la
+    binh thuong.
+
+  - Tien ich cang co it dau hieu de nhan ra cho can sua thi cang
+    hay tim nham. Nhung cho co chu rieng, ten rieng thi rat on
+    dinh. Nhung con so tran lan giong het nhau thi hay hong.
+
+  - Day la ban dau tien, chua duoc kiem thu ky. Neu gap loi la
+    do phan mem chua hoan thien, khong phai do ban dung sai.
+
+
+----------------------------------------------------------------
+9. BANG TRA NHANH
+----------------------------------------------------------------
+
+  Muon sua mot chu tren trang
+      Bam icon -> Bat dau ghi -> F12 -> tab Elements ->
+      bam dup vao chu -> go moi -> Enter
+
+  Muon giu qua ngay mai
+      Bam "Luu Snapshot"
+
+  Muon tra trang ve nhu cu
+      Bam nut mui ten quay lui o thanh duoi
+
+  Muon bo mot thay doi
+      Bo tich o dau dong do (hoac bam thung rac de xoa han)
+
+  Muon tam tat het
+      Vao Settings, tat "Guard chong re-render"
+
+  Trang khong doi gi
+      Bam "Ap dung lai" o thanh duoi
+
+================================================================
