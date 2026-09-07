@@ -249,14 +249,29 @@ function fingerprintDedupKey(change: Change): string {
  * Nói cách khác: fingerprint phải mô tả element ở trạng thái GỐC của trang,
  * vì đó mới là thứ matcher gặp khi trang vừa tải xong.
  */
-function textBeforeEdit(el: Element, index: number, oldData: string): { own: string; full: string } {
+function textBeforeEdit(
+  el: Element,
+  index: number,
+  oldData: string,
+  /**
+   * Giá trị gốc của các text node ANH EM cũng đang có change riêng, tra theo
+   * chỉ số. Thiếu tham số này thì các node đó bị đọc ở giá trị HIỆN TẠI và
+   * fingerprint thành "gốc lai" — nửa cũ nửa mới, không khớp trang ở bất kỳ
+   * thời điểm nào, nên mất luôn tín hiệu nặng nhất.
+   */
+  siblingOldData?: ReadonlyMap<number, string>,
+): { own: string; full: string } {
   let own = '';
   let full = '';
   let textIndex = 0;
   for (let node = el.firstChild; node; node = node.nextSibling) {
     if (isTextNode(node)) {
-      // Đúng text node vừa bị sửa thì thay bằng nội dung cũ của nó.
-      const data = textIndex === index ? oldData : (node.nodeValue ?? '');
+      // Đúng text node vừa bị sửa thì thay bằng nội dung cũ của nó; các node
+      // anh em đã từng bị sửa thì lấy giá trị gốc đã ghi lại của chúng.
+      const data =
+        textIndex === index
+          ? oldData
+          : (siblingOldData?.get(textIndex) ?? node.nodeValue ?? '');
       own += data;
       full += data;
       textIndex++;

@@ -105,6 +105,17 @@ export const MAX_ANCESTOR_VOLATILE_CLASSES = 6;
  */
 export const VOLATILE_CLASS_BOOST = 0.1;
 
+/**
+ * Hệ số phạt khi element không có danh tính nào ngoài CHỮ, mà chữ lại chỉ gần
+ * giống chứ không khớp tuyệt đối.
+ *
+ * 0.6 được chọn để một ứng viên "gần giống" tụt từ khoảng 0.89 xuống ~0.53 —
+ * rơi xuống DƯỚI `matchThreshold` mặc định (0.55), tức là bị loại hẳn thay vì
+ * thắng. Còn ứng viên khớp tuyệt đối thì không bị đụng tới, nên khoảng cách
+ * giữa hai bên nới rộng ra và `matchMargin` cũng dễ thoả hơn.
+ */
+export const TEXT_ONLY_FUZZY_PENALTY = 0.6;
+
 /* -------------------------------- matching -------------------------------- */
 
 /** Hard cap on candidates scored per fingerprint, to keep replay cheap. */

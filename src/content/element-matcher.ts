@@ -27,6 +27,7 @@ import {
   TAG_MISMATCH_PENALTY,
   TEST_ID_ATTRS,
   TEXT_FINGERPRINT_MAX,
+  TEXT_ONLY_FUZZY_PENALTY,
   VOLATILE_CLASS_BOOST,
 } from '@/shared/constants';
 import { log } from '@/shared/logger';
@@ -211,11 +212,47 @@ function jac(a: string[], b: string[]): number {
   }
 }
 
-/** Text signals: fuzzy, with a nudge when one string wholly contains the other. */
+/**
+ * Chuỗi mà nội dung của nó là một GIÁ TRỊ chứ không phải câu chữ: số tiền, số
+ * lượng, phần trăm, ngày tháng. Chỉ gồm chữ số và dấu phân cách/tiền tệ.
+ */
+const NUMERIC_TEXT_RE = /^[\d\s.,:/+\-%$€£¥₫]+$/;
+
+/** Có ít nhất một chữ số thì mới coi là "giá trị"; " - " không tính. */
+const HAS_DIGIT_RE = /\d/;
+
+function isNumericText(s: string): boolean {
+  return HAS_DIGIT_RE.test(s) && NUMERIC_TEXT_RE.test(s);
+}
+
+/**
+ * Text signals: fuzzy, with a nudge when one string wholly contains the other.
+ *
+ * NGOẠI LỆ QUAN TRỌNG cho chuỗi thuần số. Sorensen-Dice đếm bigram chung, nên
+ * nó MÙ với độ lớn: "55000" so với "55001", "65000" hay "95000" đều ra đúng
+ * 0.750 — lệch 1 đơn vị và lệch 40.000 được chấm bằng điểm nhau. Trên một bảng
+ * số liệu (đúng loại trang công cụ này nhắm tới) đó là thảm hoạ: hàng bên cạnh
+ * đạt gần 90% và thắng tự tin, nên chữ mới bị ghi đè sang NHẦM HÀNG, rồi binding
+ * dính lại nên mỗi lượt render sau đều ghi tiếp.
+ *
+ * Với hai giá trị số, "gần giống" KHÔNG có nghĩa là "cùng một chỗ" — 55001 là
+ * một con số khác hẳn, không phải 55000 bị render lệch. Nên chỉ khớp tuyệt đối
+ * mới được tính; còn lại phạt thẳng tay thay vì cho điểm an ủi.
+ */
 function textScore(want: string, got: string): number {
   if (!want) return got ? 0 : 1;
   if (!got) return 0;
   if (want === got) return 1;
+
+  if (isNumericText(want) && isNumericText(got)) {
+    // Đã khác nhau sau chuẩn hoá thì là hai giá trị khác nhau. Để lại một chút
+    // điểm cho trường hợp trang định dạng lại (1000 -> 1.000) chứ không cho 0
+    // hẳn, nhưng đủ thấp để không bao giờ tự mình thắng nổi một ứng viên khác.
+    return normalizeText(want).replace(/[^\d]/g, '') === normalizeText(got).replace(/[^\d]/g, '')
+      ? 0.9
+      : 0.05;
+  }
+
   let s = sim(want, got);
   if (want.length >= 3 && got.length >= 3 && (got.includes(want) || want.includes(got))) {
     s = Math.min(1, s + 0.15);
@@ -287,6 +324,43 @@ function derivedOf(el: Element, ctx: ScoreContext): Derived {
 function semanticOf(el: Element, ctx: ScoreContext): string[] {
   const d = derivedOf(el, ctx);
   return (d.semantic ??= [...semanticClassTokens(el)]);
+}
+
+/**
+ * Fingerprint này có danh tính nào ngoài chữ không?
+ *
+ * `semanticClasses` cố tình KHÔNG tính là danh tính: class băm bị lọc hết nên
+ * mảng rỗng chính là ca đang nói tới, còn class thật thì đã được xét riêng.
+ */
+function isTextOnlyIdentity(fp: ElementFingerprint): boolean {
+  return !(
+    fp.id ||
+    fp.testId ||
+    fp.ariaLabel ||
+    fp.ariaLabelledByText ||
+    fp.name ||
+    fp.href ||
+    fp.src ||
+    fp.placeholder ||
+    fp.alt ||
+    fp.title ||
+    fp.semanticClasses.length > 0
+  );
+}
+
+/** Chữ của element khớp TUYỆT ĐỐI một trong hai trạng thái đã ghi. */
+function textMatchesExactly(fp: ElementFingerprint, el: Element, ctx: ScoreContext): boolean {
+  const own = ownTextOf(el, ctx);
+  if (own) {
+    if (fp.ownText && own === fp.ownText) return true;
+    if (fp.ownTextAlt && own === fp.ownTextAlt) return true;
+  }
+  const full = truncTextOf(el, ctx);
+  if (full) {
+    if (fp.text && full === fp.text) return true;
+    if (fp.textAlt && full === fp.textAlt) return true;
+  }
+  return false;
 }
 
 function volatileOf(el: Element, ctx: ScoreContext): string[] {
@@ -576,10 +650,18 @@ function scoreWith(fp: ElementFingerprint, el: Element, ctx: ScoreContext): numb
       // The element genuinely had no classes; gaining some is weak counter-
       // evidence, not proof of a different element.
       add(W.semanticClasses, el.classList.length === 0 ? 1 : 0.35);
+    } else if (fp.volatileClasses && fp.volatileClasses.length > 0) {
+      // Fingerprint toàn atomic/hashed CSS (Facebook). Trước đây nhánh này bị
+      // BỎ QUA hẳn, và đó là một lỗ thật: element mất trắng 12đ khỏi cả tử lẫn
+      // mẫu, nên với một <span class="x108nfp6">55000</span> thì mẫu số tụt còn
+      // 92 và chữ chiếm tới 34/92 — quyết định gần như chỉ còn dựa vào độ giống
+      // chữ, đúng thứ mong manh nhất trên một bảng đầy số na ná nhau.
+      //
+      // Class băm không sống qua deploy, nhưng khi nó là danh tính DUY NHẤT còn
+      // lại thì thà dùng nó còn hơn không có gì. Dùng nửa trọng số: đủ để tách
+      // hai node khác kiểu, không đủ để một mình quyết định.
+      add(W.semanticClasses / 2, jac(fp.volatileClasses, volatileOf(el, ctx)));
     }
-    // else: the fingerprint was 100% atomic/hashed CSS (Facebook). Scoring
-    // jaccard against an empty set would punish every candidate equally and
-    // just dilute the useful signals, so the signal is skipped entirely.
 
     if (fp.attrKeys.length > 0) add(W.attrKeys, jac(fp.attrKeys, attrKeysCached(el, ctx)));
 
@@ -628,6 +710,17 @@ function scoreWith(fp: ElementFingerprint, el: Element, ctx: ScoreContext): numb
     // phạt đúng ở những ca nó nên giúp nhất.
     const bonus = clamp01(volatileChainBonus(fp, el, ctx));
     score += (1 - score) * VOLATILE_CLASS_BOOST * bonus;
+
+    // Phạt khi element KHÔNG có danh tính nào ngoài chữ, mà chữ lại chỉ gần
+    // giống chứ không khớp. Không có chốt này thì một hàng "55001" bên cạnh đạt
+    // gần 90% và thắng tự tin — chữ mới bị ghi sang nhầm hàng, rồi binding dính
+    // lại nên mỗi lượt render sau đều ghi tiếp, hỏng dai dẳng.
+    //
+    // "Gần giống" chỉ là bằng chứng khi có thứ khác đỡ lưng (id, testid, nhãn
+    // aria, class thật). Một mình nó thì không đủ để động vào DOM của người ta.
+    if (isTextOnlyIdentity(fp) && !textMatchesExactly(fp, el, ctx)) {
+      score *= TEXT_ONLY_FUZZY_PENALTY;
+    }
     return clamp01(score);
   } catch (err) {
     log.error('scoreCandidate failed', err);
@@ -883,7 +976,13 @@ function generate(state: GenState, fp: ElementFingerprint, scope: Scope, anchor:
   // khi F5 lại mang chữ gốc. Chỉ quét một bên là mù hẳn ở thời điểm còn lại.
   const wants: string[] = [];
   for (const candidate of [fp.ownText, fp.text, fp.ownTextAlt, fp.textAlt]) {
-    if (candidate && !wants.includes(candidate)) wants.push(candidate);
+    // Chữ dài hơn TEXT_FINGERPRINT_MAX đã bị `truncate` gắn '…' vào đuôi. Ký tự
+    // đó KHÔNG có trên trang, nên prefilter `haystackHas` trượt và cả generator
+    // theo chữ chết câm — đúng với những element dài mà chữ là danh tính duy
+    // nhất. Cắt đuôi đi rồi tìm bằng phần đầu; `collectByText` đã có sẵn nhánh
+    // "fingerprint text là tiền tố" để xử lý phần khớp một phần.
+    const raw = candidate ? candidate.replace(/…$/, '') : '';
+    if (raw && !wants.includes(raw)) wants.push(raw);
   }
   if (wants.length > 0) {
     const haystack: Haystack = { raw: '' };
@@ -969,6 +1068,54 @@ function strategyFor(state: GenState, usedAnchor: boolean): MatchStrategy {
     if (contributing[0] === 'path') return 'path';
   }
   return usedAnchor ? 'anchored' : 'scored';
+}
+
+/**
+ * Element duy nhất trên trang mà CHỮ CỦA CHÍNH NÓ khớp tuyệt đối chuỗi đã ghi.
+ *
+ * Dùng `ownText` (chữ của riêng element, không tính cây con) chứ không dùng
+ * `text`: với `<div><span>55000</span></div>` thì cả div lẫn span đều có
+ * textContent "55000", nhưng chỉ span mới thực sự SỞ HỮU mảnh chữ đó — và span
+ * mới là thứ user sửa.
+ *
+ * Thử cả hai trạng thái: chữ gốc (trang vừa tải lại) và chữ mới (ta đã áp rồi,
+ * hoặc user vừa sửa xong). Trả null ngay khi có từ hai ứng viên trở lên — mơ hồ
+ * thì để bộ chấm điểm phân giải, tuyệt đối không đoán.
+ */
+function uniqueElementByOwnText(fp: ElementFingerprint, scope: Scope): Element | null {
+  const wanted: string[] = [];
+  for (const candidate of [fp.ownText, fp.ownTextAlt]) {
+    // Chuỗi bị `truncate` cắt (có '…' ở đuôi) không còn là giá trị tuyệt đối
+    // nữa, nên không dùng được cho đường tắt này.
+    if (candidate && !candidate.endsWith('…') && !wanted.includes(candidate)) {
+      wanted.push(candidate);
+    }
+  }
+  if (wanted.length === 0) return null;
+
+  let found: Element | null = null;
+  try {
+    const root = scope.nodeType === Node.DOCUMENT_NODE ? (scope as Document).documentElement : scope;
+    if (!root) return null;
+    const walker = docOf(scope).createTreeWalker(root as Node, NodeFilter.SHOW_TEXT);
+    let scanned = 0;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (++scanned > MAX_TEXT_NODES) return null;
+      const raw = node.nodeValue;
+      if (!raw || !raw.trim()) continue;
+      const el = node.parentElement;
+      if (!el || tagOf(el) !== fp.tag) continue;
+      if (isSkippedElement(el) || isOurNode(el)) continue;
+      if (!wanted.includes(normalizeText(ownText(el)))) continue;
+      // Hai element khác nhau cùng khớp -> mơ hồ, nhường cho bộ chấm điểm.
+      if (found && found !== el) return null;
+      found = el;
+    }
+  } catch (err) {
+    log.debug('exact own-text fast path failed', err);
+    return null;
+  }
+  return found;
 }
 
 function emptyResult(): MatchResult {
@@ -1078,6 +1225,23 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
         const el = found[0];
         const score = verify(el);
         if (score >= 0) return accept(el, score, 'testid');
+      }
+    }
+
+    /* --- 2b-bis. chữ khớp tuyệt đối và DUY NHẤT --------------------------- */
+    // Phần lớn thao tác thật chỉ là sửa chữ, và với sửa chữ thì ta biết CHÍNH
+    // XÁC chuỗi gốc là gì. Không việc gì phải đem cả bộ chấm điểm mờ ra cân
+    // đong: cứ tìm đúng chuỗi đó trên trang, thấy đúng MỘT chỗ thì chính là nó.
+    //
+    // Đây cũng là cách chắc chắn nhất để không lặp lại lỗi ghi nhầm sang hàng
+    // bên cạnh — "55001" đơn giản là không khớp tuyệt đối với "55000" nên không
+    // bao giờ lọt vào đây. Chỉ khi chuỗi xuất hiện nhiều chỗ mới cần tới điểm
+    // số để phân giải.
+    {
+      const exact = uniqueElementByOwnText(fp, scope);
+      if (exact) {
+        const score = verify(exact);
+        if (score >= 0) return accept(exact, score, 'text');
       }
     }
 
