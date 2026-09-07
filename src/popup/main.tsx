@@ -11,16 +11,15 @@ import { createRoot } from 'react-dom/client';
 
 import { log } from '@/shared/logger';
 
-import { AuthGate } from './components/AuthGate';
+import { App } from './App';
 import './styles.css';
-import './auth.css';
 
 const container = document.getElementById('root');
 
 if (container) {
   createRoot(container).render(
     <StrictMode>
-      <AuthGate />
+      <App />
     </StrictMode>,
   );
 } else {

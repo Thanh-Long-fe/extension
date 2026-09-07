@@ -10,9 +10,7 @@
     "build:content": "vite build --config vite.content.config.ts",
     "build:background": "vite build --config vite.background.config.ts",
     "build:static": "node scripts/copy-static.mjs",
-    "build:obfuscate": "node scripts/obfuscate.mjs",
-    "build": "npm run typecheck && npm run build:popup && npm run build:content && npm run build:background && npm run build:static && npm run build:obfuscate",
-    "build:raw": "npm run typecheck && npm run build:popup && npm run build:content && npm run build:background && npm run build:static",
+    "build": "npm run typecheck && npm run build:popup && npm run build:content && npm run build:background && npm run build:static",
     "dev": "node scripts/dev.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
@@ -27,7 +25,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.1",
-    "javascript-obfuscator": "^4.1.1",
     "typescript": "~5.9.3",
     "vite": "^8.2.2"
   }
