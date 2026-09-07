@@ -16,12 +16,36 @@
 import { hashString } from './id';
 import type { Change, ElementFingerprint } from './types';
 
+/**
+ * Ký tự ngăn cách giữa các trường khi băm.
+ *
+ * Không bao giờ xuất hiện trong HTML hay CSS selector, nên "ab" + "c" không thể
+ * băm ra cùng chuỗi với "a" + "bc".
+ */
+const SEP = '';
+
 /** Băm gọn phần định danh ổn định của element mà change trỏ tới. */
 export function fingerprintIdentity(fp: ElementFingerprint): string {
   return hashString(
-    [fp.tag, fp.id ?? '', fp.testId ?? '', fp.ariaLabel ?? '', fp.role ?? '', fp.ownText ?? '', fp.path].join(
-      '',
-    ),
+    [
+      fp.tag,
+      fp.id ?? '',
+      fp.testId ?? '',
+      fp.ariaLabel ?? '',
+      fp.role ?? '',
+      fp.ownText ?? '',
+      // BẮT BUỘC phải có `anchorSelector`. `path` là đường đi TƯƠNG ĐỐI với
+      // anchor, nên hai node ở hai vùng khác nhau của trang hoàn toàn có thể
+      // mang CÙNG một path. Ví dụ kinh điển: bảng mà mỗi <tr> có id riêng — khi
+      // đó anchor của mỗi ô chính là dòng của nó, và path của ô thứ hai ở MỌI
+      // dòng đều là 'td:1'.
+      //
+      // Thiếu nó thì hai lần sửa ở hai dòng khác nhau băm ra CÙNG một khoá, và
+      // `Recorder.restore` bỏ im lặng cái thứ hai: user sửa hai ô, chỉ một ô
+      // được áp lại, ô kia biến mất khỏi cả bản nháp lẫn storage.
+      fp.anchorSelector ?? '',
+      fp.path,
+    ].join(SEP),
   );
 }
 

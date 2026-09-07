@@ -550,6 +550,12 @@ export class Replayer {
         rec.detached = false;
         this.styles.clearChange(change.id);
       }
+      // Thay đổi bị tắt thì phải NHẢ ô nó đang giữ. Không nhả là khoá vĩnh viễn
+      // một ô mà chẳng ai dùng — và nếu ô đó là thứ một thay đổi khác đang cần
+      // thì thay đổi kia không bao giờ tìm được chỗ, chỉ vì user bỏ tick một
+      // dòng chẳng liên quan.
+      this.releaseRecord(rec);
+      rec.bound = false;
       rec.status = 'skipped';
       return;
     }

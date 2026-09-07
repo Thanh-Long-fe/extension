@@ -558,8 +558,18 @@ export class Recorder {
         if (!change?.id || !change.target) continue;
         // Đã có sẵn trong buffer (ví dụ bị gọi restore hai lần): đừng nhân đôi.
         if (this.keyOf.has(change.id)) continue;
-        const key = fingerprintDedupKey(change);
-        if (this.byKey.has(key)) continue;
+
+        // Hai change KHÁC NHAU vẫn có thể băm ra cùng khoá fingerprint khi mọi
+        // dấu hiệu của chúng trùng khít (hai ô cùng chữ trong một bảng). Trước
+        // đây chỗ này `continue` — tức âm thầm VỨT change thứ hai, và user sửa
+        // hai ô thì chỉ một ô quay lại sau F5, ô kia mất hẳn.
+        //
+        // Khoá chỉ để gộp cho tiện, không phải để quyết định giữ hay bỏ. Trùng
+        // thì cấp một khoá riêng kèm id — id vốn đã là duy nhất — rồi giữ cả
+        // hai. Mất dữ liệu của người ta luôn tệ hơn là gộp hụt một lần.
+        let key = fingerprintDedupKey(change);
+        if (this.byKey.has(key)) key = `${key}#${change.id}`;
+
         this.byKey.set(key, change);
         this.keyOf.set(change.id, key);
         this.order.push(change);

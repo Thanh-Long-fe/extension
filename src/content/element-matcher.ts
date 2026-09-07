@@ -1343,16 +1343,21 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
       };
     }
 
-    // "Mơ hồ" nghĩa là hai ứng viên gần bằng điểm nhau, và mặc định thì ta bỏ
-    // qua cho chắc. Nhưng khi caller có `taken` — tức mỗi element chỉ thuộc về
-    // một change — thì nỗi lo đó không còn: ứng viên tốt nhất chắc chắn CHƯA bị
-    // change nào chiếm (rank đã loại hết những cái đã có chủ), nên nhận nó
-    // không thể giẫm lên ai.
+    // "Mơ hồ" = hai ứng viên gần bằng điểm nhau, mặc định thì bỏ qua cho chắc.
     //
-    // Và với hai ô giống hệt nhau thì cố phân biệt "ô nào là ô nào" vốn vô
-    // nghĩa: mọi tín hiệu của chúng đều trùng khít. Cứ nhận ô còn trống, change
-    // tiếp theo sẽ nhận ô còn lại — sửa hai ô thì ăn cả hai.
-    const ambiguous = bestScore - runnerUp < margin && !taken;
+    // Chỉ bỏ qua nỗi lo đó khi có ĐỦ HAI điều kiện:
+    //   - `taken`: mỗi element chỉ thuộc về một change, nên nhận ứng viên tốt
+    //     nhất không thể giẫm lên change khác, và change tiếp theo sẽ nhận ô
+    //     còn lại. Đây là thứ làm "sửa hai ô thì ăn cả hai" chạy được.
+    //   - chữ khớp TUYỆT ĐỐI: bằng chứng thật rằng đây đúng là loại node ta tìm,
+    //     chỉ là trang có nhiều bản sao giống hệt.
+    //
+    // Thiếu điều kiện thứ hai là hỏng: replayer luôn truyền `taken`, nên nếu chỉ
+    // dựa vào nó thì cơ chế chống-áp-nhầm bị tắt cho MỌI thay đổi. Một style
+    // change trỏ vào nút "Xoá" giữa mười nút "Xoá" giống hệt sẽ bị áp bừa vào
+    // cái đầu tiên thay vì dừng lại — mất trắng lớp bảo vệ.
+    const ambiguous =
+      bestScore - runnerUp < margin && !(taken && textMatchesExactly(fp, best, ctx));
 
     /* --- 6. remember it -------------------------------------------------- */
     if (opts.cacheKey && !ambiguous) primeCache(opts.cacheKey, best);
