@@ -1285,6 +1285,13 @@ export class Recorder {
     }
 
     if (!prev) {
+      // Mặc định CHỈ tick sẵn thay đổi text. Các loại khác (style, class,
+      // attribute, ẩn/xoá, chèn) vẫn được ghi và hiện trong danh sách, nhưng bỏ
+      // tick — user tự tick cái nào muốn giữ. Sửa chữ là thao tác thường gặp và
+      // ít rủi ro nhất, còn style/class/insert dễ đụng vào phần app tự dựng nên
+      // để user chủ động chọn thì an toàn hơn. Tick vào là apply ngay (popup
+      // gọi cs:pending:setEnabled -> syncPending).
+      fresh.enabled = fresh.type === 'text';
       this.byKey.set(key, fresh);
       this.keyOf.set(fresh.id, key);
       this.order.push(fresh);
