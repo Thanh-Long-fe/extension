@@ -661,6 +661,20 @@ export class Replayer {
       return null;
     }
 
+    // Chốt cuối cho sửa chữ: element này có thật sự đang chứa giá trị CŨ (trang
+    // vừa render lại) hay giá trị MỚI (ta đã áp rồi) không?
+    //
+    // Điểm số chỉ nói "trông giống", còn đây là bằng chứng. Không có chốt này
+    // thì một element chấm điểm cao nhưng nội dung chẳng liên quan vẫn được
+    // nhận, rồi ta ghi đè lên chữ của trang ở một chỗ hoàn toàn khác — hỏng dữ
+    // liệu người ta mà không ai biết. Chưa khớp thì coi như chưa tìm thấy và
+    // thử lại ở lượt sau, lúc trang đã dựng xong phần còn lại.
+    if (change.type === 'text' && !this.pickTextNode(result.element, change, true)) {
+      rec.status = 'unmatched';
+      log.debug('Replayer: bỏ qua ứng viên vì không mang giá trị cũ', change.id);
+      return null;
+    }
+
     rec.element = new WeakRef(result.element);
     rec.bound = true;
     this.boundEls.add(result.element);
@@ -778,7 +792,7 @@ export class Replayer {
    * Chấp nhận cả `oldValue` (trang vừa render lại, chưa áp) lẫn `value` (ta đã
    * áp rồi, đang chạy lại để xác nhận) — cùng một node ở hai thời điểm.
    */
-  private pickTextNode(el: Element, change: TextChange): Text | null {
+  private pickTextNode(el: Element, change: TextChange, requireContent = false): Text | null {
     const nodes = textNodesOf(el);
     if (nodes.length === 0) return null;
 
@@ -801,6 +815,12 @@ export class Replayer {
       if (byIndex && matched.includes(byIndex)) return byIndex;
       return null;
     }
+
+    // Từ đây trở xuống không còn bằng chứng NỘI DUNG nào nữa, chỉ còn vị trí.
+    // `requireContent` là lúc ta đang XÁC MINH xem có đúng element không, và
+    // khi đó vị trí là không đủ: chấp nhận bừa nghĩa là ghi đè lên chữ của
+    // trang ở một chỗ hoàn toàn khác.
+    if (requireContent) return null;
 
     // 3. Không node nào mang nội dung mong đợi. Chỉ số còn hợp lệ thì vẫn dùng
     //    (trang có thể đã đổi chữ vì lý do khác), nhưng KHÔNG rơi về nodes[0].

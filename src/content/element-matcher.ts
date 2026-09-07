@@ -25,7 +25,6 @@ import {
   MATCH_WEIGHTS,
   MAX_CANDIDATES,
   TAG_MISMATCH_PENALTY,
-  STRUCTURAL_TIEBREAK_MARGIN,
   TEST_ID_ATTRS,
   TEXT_FINGERPRINT_MAX,
   TEXT_ONLY_FUZZY_PENALTY,
@@ -1032,8 +1031,6 @@ interface Ranking {
   best: Element | null;
   bestScore: number;
   runnerUp: number;
-  /** Giữ lại để phá thế hoà bằng vị trí khi hai ứng viên gần bằng điểm. */
-  runnerUpEl: Element | null;
   scored: number;
 }
 
@@ -1045,7 +1042,7 @@ function rank(
   seed: Ranking,
   taken?: (el: Element) => boolean,
 ): Ranking {
-  let { best, bestScore, runnerUp, runnerUpEl, scored } = seed;
+  let { best, bestScore, runnerUp, scored } = seed;
   for (let i = 0; i < pool.length; i++) {
     const el = pool[i];
     // Element đã thuộc về change khác: bỏ qua hẳn, kể cả khi nó đạt điểm cao
@@ -1059,19 +1056,17 @@ function rank(
     scored++;
     if (score > bestScore) {
       runnerUp = bestScore;
-      runnerUpEl = best;
       bestScore = score;
       best = el;
     } else if (score > runnerUp) {
       runnerUp = score;
-      runnerUpEl = el;
     }
     if ((i & 15) === 15 && performance.now() - startedAt > SCORE_BUDGET_MS) {
       log.debug('match scoring budget exhausted', { scored, pool: pool.length });
       break;
     }
   }
-  return { best, bestScore, runnerUp, runnerUpEl, scored };
+  return { best, bestScore, runnerUp, scored };
 }
 
 /**
@@ -1328,19 +1323,13 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
     if (state.total === 0) return emptyResult();
 
     /* --- 4./5. score & rank --------------------------------------------- */
-    let ranking: Ranking = {
-      best: null,
-      bestScore: 0,
-      runnerUp: 0,
-      runnerUpEl: null,
-      scored: 0,
-    };
+    let ranking: Ranking = { best: null, bestScore: 0, runnerUp: 0, scored: 0 };
     ranking = rank(fp, state.sameTag, ctx, startedAt, ranking, taken);
     if (ranking.bestScore < threshold && state.otherTag.length > 0) {
       ranking = rank(fp, state.otherTag, ctx, startedAt, ranking, taken);
     }
 
-    const { best, bestScore, runnerUp, runnerUpEl, scored } = ranking;
+    const { best, bestScore, runnerUp, scored } = ranking;
     const strategy = strategyFor(state, usedAnchor);
 
     if (!best || bestScore < threshold) {
@@ -1354,28 +1343,16 @@ export function findElement(fp: ElementFingerprint, opts: MatchOptions): MatchRe
       };
     }
 
-    let ambiguous = bestScore - runnerUp < margin;
-
-    // Hai ứng viên sát điểm nhau nhưng ĐỨNG Ở HAI CHỖ KHÁC NHAU thì thật ra
-    // không hề mơ hồ — chỉ là mọi tín hiệu nội dung của chúng đều giống hệt.
-    // Đúng cảnh hai ô cùng chữ trong một bảng: chữ, thẻ, class, tổ tiên đều
-    // trùng khít, và thứ DUY NHẤT phân biệt được là vị trí.
+    // "Mơ hồ" nghĩa là hai ứng viên gần bằng điểm nhau, và mặc định thì ta bỏ
+    // qua cho chắc. Nhưng khi caller có `taken` — tức mỗi element chỉ thuộc về
+    // một change — thì nỗi lo đó không còn: ứng viên tốt nhất chắc chắn CHƯA bị
+    // change nào chiếm (rank đã loại hết những cái đã có chủ), nên nhận nó
+    // không thể giẫm lên ai.
     //
-    // Bỏ cuộc ở đây là bỏ cuộc oan: người dùng sửa hai ô thì phải ăn cả hai. Nên
-    // khi đường đi tới ứng viên tốt nhất khớp rõ rệt hơn ứng viên nhì, ta tin
-    // vào vị trí thay vì tuyên bố mơ hồ.
-    if (ambiguous && runnerUpEl && best !== runnerUpEl) {
-      const bestPath = pathSuffixRatio(fp.path, pathOf(best, ctx));
-      const runnerPath = pathSuffixRatio(fp.path, pathOf(runnerUpEl, ctx));
-      if (bestPath - runnerPath >= STRUCTURAL_TIEBREAK_MARGIN) ambiguous = false;
-      // Cùng cha thì `childIndex` là thước đo trực tiếp nhất; path có thể trùng
-      // nhau khi hai node cùng tag đứng cạnh nhau dưới cùng một cha.
-      else if (best.parentElement && best.parentElement === runnerUpEl.parentElement) {
-        const bestIdx = indexScore(fp.childIndex, elementChildIndex(best));
-        const runnerIdx = indexScore(fp.childIndex, elementChildIndex(runnerUpEl));
-        if (bestIdx - runnerIdx >= STRUCTURAL_TIEBREAK_MARGIN) ambiguous = false;
-      }
-    }
+    // Và với hai ô giống hệt nhau thì cố phân biệt "ô nào là ô nào" vốn vô
+    // nghĩa: mọi tín hiệu của chúng đều trùng khít. Cứ nhận ô còn trống, change
+    // tiếp theo sẽ nhận ô còn lại — sửa hai ô thì ăn cả hai.
+    const ambiguous = bestScore - runnerUp < margin && !taken;
 
     /* --- 6. remember it -------------------------------------------------- */
     if (opts.cacheKey && !ambiguous) primeCache(opts.cacheKey, best);
