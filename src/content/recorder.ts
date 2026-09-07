@@ -1,3 +1,4 @@
+
 /**
  * The recorder: raw `MutationRecord`s in, semantic `Change`s out.
  *
@@ -311,6 +312,18 @@ function nearestElementSibling(from: Node | null, dir: 'previous' | 'next'): Ele
   return null;
 }
 
+/** So hai chuỗi sau khi chuẩn hoá khoảng trắng / ký tự vô hình. */
+function sameText(a: string, b: string): boolean {
+  return a === b || normalizeText(a) === normalizeText(b);
+}
+
+/** Như `sameText` nhưng chấp nhận `null` ("attribute không tồn tại"). */
+function sameNullableText(a: string | null, b: string | null): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  return normalizeText(a) === normalizeText(b);
+}
+
 /**
  * True when the pending change no longer represents an edit — the user typed
  * something and then typed the original back, or added and removed the same
@@ -318,10 +331,14 @@ function nearestElementSibling(from: Node | null, dir: 'previous' | 'next'): Ele
  */
 function isUndone(change: Change): boolean {
   switch (change.type) {
+    // Chuẩn hoá, cùng lý do với `isAppOverwrite`: so thô thì một change đã thực
+    // sự bị hoàn tác (chỉ khác nbsp/khoảng trắng) không được dọn đi, để lại một
+    // "change ma" mà replayer cứ ghi đè mãi — trang nhấp nháy vì ta và app
+    // giành nhau một ô mà thực chất hai bên đang muốn cùng một giá trị.
     case 'text':
-      return change.value === change.oldValue;
+      return sameText(change.value, change.oldValue);
     case 'attribute':
-      return change.value === change.oldValue;
+      return sameNullableText(change.value, change.oldValue);
     case 'style':
       return change.value === change.oldValue;
     case 'class':
@@ -1366,12 +1383,18 @@ export class Recorder {
     if (prev.source === 'devtools' && fresh.source !== 'devtools') return true;
 
     switch (prev.type) {
+      // So sánh đã CHUẨN HOÁ, không so thô. Trang render lại chữ gốc hiếm khi
+      // ra byte y hệt lúc ta chụp: nbsp thay space, xuống dòng và thụt lề của
+      // template, zero-width joiner của i18n. So thô là chốt này hở, mà hở ở
+      // đây nghĩa là chỉnh sửa của user bị nuốt mất im lặng — đúng thứ hàm này
+      // sinh ra để chặn. Mọi tầng khác (matcher, dedup, sameAttrValue) đều đã
+      // chuẩn hoá, chỉ riêng chỗ này lệch chuẩn.
       case 'text':
-        return fresh.type === 'text' && fresh.value === prev.oldValue;
+        return fresh.type === 'text' && sameText(fresh.value, prev.oldValue);
       case 'attribute':
-        return fresh.type === 'attribute' && fresh.value === prev.oldValue;
+        return fresh.type === 'attribute' && sameNullableText(fresh.value, prev.oldValue);
       case 'style':
-        return fresh.type === 'style' && fresh.value === prev.oldValue;
+        return fresh.type === 'style' && sameText(fresh.value, prev.oldValue);
       default:
         return false;
     }

@@ -37,7 +37,7 @@ import type {
   TextChange,
 } from '@/shared/types';
 import { DEFAULT_SETTINGS, EMPTY_REPLAY_STATS } from '@/shared/types';
-import { elementLabel, textNodesOf } from './dom-utils';
+import { elementLabel, normalizeText, textNodesOf } from './dom-utils';
 import { findElement, invalidateCache, primeCache } from './element-matcher';
 import type { StyleManager } from './style-manager';
 
@@ -681,10 +681,7 @@ export class Replayer {
     const owned = rec.createdText?.deref() ?? null;
     const ours = owned && owned.isConnected && owned.parentNode === el ? owned : null;
 
-    const nodes = textNodesOf(el);
-    const picked = nodes[change.textNodeIndex] ?? nodes[0] ?? null;
-    let node: Text | null = picked instanceof Text ? picked : null;
-    if (!node) node = ours;
+    let node: Text | null = this.pickTextNode(el, change) ?? ours;
 
     if (!node) {
       if (!change.value) {
@@ -715,6 +712,61 @@ export class Replayer {
           target.data = previousData;
         };
     return true;
+  }
+
+  /**
+   * Chọn ĐÚNG text node để ghi vào.
+   *
+   * Trước đây chỗ này chỉ có `nodes[textNodeIndex] ?? nodes[0]`, và đó là nguồn
+   * gốc của kiểu sai khó chịu nhất: áp đúng element nhưng ghi vào NHẦM mảnh chữ.
+   * Chỉ số vị trí không ổn định vì hai lý do độc lập nhau:
+   *
+   *   - text node chỉ chứa khoảng trắng cũng chiếm một ô trong không gian chỉ
+   *     số. Framework thêm/bớt một node whitespace là mọi chỉ số phía sau lệch.
+   *   - re-render có thể gộp/tách text node liền kề (innerHTML, normalize),
+   *     làm chỉ số vượt phạm vi. Lúc đó `?? nodes[0]` âm thầm ghi đè vào mảnh
+   *     chữ ĐẦU TIÊN — thường là một nhãn hoàn toàn khác.
+   *
+   * Nên bây giờ NỘI DUNG là bằng chứng chính, chỉ số chỉ là gợi ý. So khớp qua
+   * `normalizeText` để nbsp/xuống dòng/khoảng trắng thừa không làm trượt.
+   *
+   * Chấp nhận cả `oldValue` (trang vừa render lại, chưa áp) lẫn `value` (ta đã
+   * áp rồi, đang chạy lại để xác nhận) — cùng một node ở hai thời điểm.
+   */
+  private pickTextNode(el: Element, change: TextChange): Text | null {
+    const nodes = textNodesOf(el);
+    if (nodes.length === 0) return null;
+
+    const same = (data: string, want: string): boolean =>
+      normalizeText(data) === normalizeText(want);
+    const looksRight = (n: Text): boolean =>
+      same(n.data, change.oldValue) || same(n.data, change.value);
+
+    // 1. Chỉ số trỏ đúng node mang nội dung mong đợi — chắc chắn nhất.
+    const byIndex = nodes[change.textNodeIndex];
+    if (byIndex && looksRight(byIndex)) return byIndex;
+
+    // 2. Chỉ số đã lệch: đi tìm theo nội dung. Chỉ nhận khi có DUY NHẤT một
+    //    node khớp — hai node cùng nội dung thì không có cách nào biết node nào
+    //    là node user đã sửa, và đoán bừa chính là thứ ta đang muốn diệt.
+    const matched = nodes.filter(looksRight);
+    if (matched.length === 1) return matched[0];
+    if (matched.length > 1) {
+      // Nhiều node khớp: ưu tiên node ở đúng chỉ số nếu nó nằm trong nhóm đó.
+      if (byIndex && matched.includes(byIndex)) return byIndex;
+      return null;
+    }
+
+    // 3. Không node nào mang nội dung mong đợi. Chỉ số còn hợp lệ thì vẫn dùng
+    //    (trang có thể đã đổi chữ vì lý do khác), nhưng KHÔNG rơi về nodes[0].
+    if (byIndex) return byIndex;
+
+    // 4. Element chỉ có đúng một mảnh chữ — không có gì để nhầm.
+    if (nodes.length === 1) return nodes[0];
+
+    // 5. Nhiều mảnh chữ mà không mảnh nào khớp và chỉ số thì vượt phạm vi:
+    //    thà không ghi gì còn hơn ghi vào chỗ sai.
+    return null;
   }
 
   /** Set or remove one attribute, never one of ours. */
